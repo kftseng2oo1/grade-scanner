@@ -337,6 +337,26 @@ self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Re
     font-family:monospace; letter-spacing:.06em; }
   #viewer-overlay .vw-lbl { font-size:12px; color:#8fa6c7; }
 
+/* 辨識結果：手機版改為卡片 */
+@media (max-width: 720px) {
+  #results-table, #results-table tbody { display:block; width:100%; }
+  #results-table thead { display:none; }
+  #results-table tr {
+    display:grid; grid-template-columns:76px 1fr auto; column-gap:10px; row-gap:6px;
+    grid-template-areas:"thumb id id" "thumb match match" "thumb score status" "conf conf conf" "save save save";
+    padding:12px 0; border-bottom:1px solid var(--border); align-items:center;
+  }
+  #results-table td { display:block; padding:0 !important; border:0 !important; min-width:0; }
+  #results-table .c-thumb { grid-area:thumb; align-self:start; }
+  #results-table .c-id { grid-area:id; }
+  #results-table .c-match { grid-area:match; word-break:break-all; }
+  #results-table .c-score { grid-area:score; }
+  #results-table .c-status { grid-area:status; text-align:right; font-size:12px; }
+  #results-table .c-conf { grid-area:conf; }
+  #results-table .c-save { grid-area:save; }
+  #results-table .c-save button { width:100%; height:36px; }
+  #results-table .c-id input { width:100% !important; }
+}
 </style>
 </head>
 <body>
@@ -1444,15 +1464,15 @@ function renderResults() {
       ? '<span style="color:var(--success);font-weight:600">✅ 已儲存</span>'
       : '<span style="color:var(--muted)">待儲存</span>';
     return `<tr id="rrow-${idx}">
-      <td><div onclick="openViewer(${idx})" style="position:relative;cursor:zoom-in;width:72px"><img src="${r.item.dataUrl}" style="width:72px;height:96px;object-fit:contain;background:#0006;border-radius:5px;border:1px solid var(--border);display:block"><span style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.65);color:#fff;border-radius:4px;font-size:10px;padding:0 3px">🔍</span></div></td>
-      <td><input type="text" value="${r.editId}" style="width:110px;height:30px;font-family:monospace;font-size:13px;text-align:center;border:1px solid var(--border);border-radius:6px;padding:0 6px"
+      <td class="c-thumb"><div onclick="openViewer(${idx})" style="position:relative;cursor:zoom-in;width:72px"><img src="${r.item.dataUrl}" style="width:72px;height:96px;object-fit:contain;background:#0006;border-radius:5px;border:1px solid var(--border);display:block"><span style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.65);color:#fff;border-radius:4px;font-size:10px;padding:0 3px">🔍</span></div></td>
+      <td class="c-id"><input type="text" value="${r.editId}" style="width:110px;height:30px;font-family:monospace;font-size:13px;text-align:center;border:1px solid var(--border);border-radius:6px;padding:0 6px"
         onchange="ocrResults[${idx}].editId=this.value;reMatchResult(${idx})"></td>
-      <td id="rmatch-${idx}"></td>
-      <td><input type="number" value="${r.editScore}" min="0" max="100" style="width:70px;height:30px;text-align:center;font-weight:700;font-size:15px;border:1px solid var(--border);border-radius:6px;padding:0 6px"
+      <td class="c-match" id="rmatch-${idx}"></td>
+      <td class="c-score"><input type="number" value="${r.editScore}" min="0" max="100" style="width:70px;height:30px;text-align:center;font-weight:700;font-size:15px;border:1px solid var(--border);border-radius:6px;padding:0 6px"
         onchange="ocrResults[${idx}].editScore=parseFloat(this.value)||''"></td>
-      <td><span style="color:${confColor};font-weight:600;font-size:12px">${confLabel}</span>${r.parsed.notes?`<div style="font-size:11px;color:var(--muted)">${r.parsed.notes}</div>`:''}</td>
-      <td id="rstatus-${idx}">${statusLabel}</td>
-      <td><button class="btn btn-success btn-sm" onclick="saveSingleResult(${idx})" ${r.saved?'disabled':''}>儲存</button></td>
+      <td class="c-conf"><span style="color:${confColor};font-weight:600;font-size:12px">${confLabel}</span>${r.parsed.notes?`<div style="font-size:11px;color:var(--muted)">${r.parsed.notes}</div>`:''}</td>
+      <td class="c-status" id="rstatus-${idx}">${statusLabel}</td>
+      <td class="c-save"><button class="btn btn-success btn-sm" onclick="saveSingleResult(${idx})" ${r.saved?'disabled':''}>儲存</button></td>
     </tr>`;
   }).join('');
   // Render match cells after DOM is built
