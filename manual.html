@@ -332,6 +332,8 @@ footer {
     <span class="cover-tag">AI 圖像辨識</span>
     <span class="cover-tag">批次上傳</span>
     <span class="cover-tag">Excel 匯出</span>
+    <span class="cover-tag">放大檢視</span>
+    <span class="cover-tag">備份還原</span>
     <span class="cover-tag">離線儲存</span>
     <span class="cover-tag">暗黑模式</span>
   </div>
@@ -381,6 +383,7 @@ footer {
             <li>所有資料儲存在本機瀏覽器（LocalStorage）</li>
             <li>重新整理後資料不會消失</li>
             <li>不需要後端伺服器</li>
+            <li>可「📤 備份到檔案」，換手機或清快取後還原</li>
             <li>AI 辨識透過 Cloudflare Worker 代理</li>
           </ul>
         </div>
@@ -439,7 +442,7 @@ footer {
           <div class="step-num">4</div>
           <div class="step-body">
             <h4>上傳考卷並辨識</h4>
-            <p>點選上傳區域選取圖片（可一次選多張），點「🔍 開始批次辨識」，AI 自動讀取學號與分數。</p>
+            <p>點選上傳區域選取圖片（可一次選多張，系統會自動壓縮以加快上傳），點「🔍 開始批次辨識」，AI 自動讀取學號與分數。</p>
           </div>
         </div>
         <div class="step">
@@ -590,9 +593,10 @@ footer {
             <h4>確認辨識結果</h4>
             <p>辨識完成後顯示結果表格，每筆包含：</p>
             <ul>
-              <li>縮圖預覽</li>
-              <li>辨識學號（可手動修改）</li>
-              <li>自動比對的學生姓名</li>
+              <li>縮圖預覽（點 🔍 可放大檢視）</li>
+              <li>辨識學號（可手動修改）。AI 看不清的字元會以 <code>?</code> 標示</li>
+              <li>自動比對的學生姓名；若學號與名冊只差 1 碼，會自動選定最接近者</li>
+              <li>若有多位相近學生，會顯示「候選」按鈕，點選正確的那位即可</li>
               <li>辨識分數（可手動修改）</li>
               <li>信心度：<span class="badge badge-green">高</span> <span class="badge badge-gold">中</span> <span class="badge badge-red">低</span>（低信心度請特別確認）</li>
             </ul>
@@ -613,6 +617,27 @@ footer {
         <span>辨識結果中的學號和分數欄位可直接在表格中修改，修改後再儲存，不需重新辨識。</span>
       </div>
 
+      <h3 style="font-size:14px;font-weight:600;color:var(--ink);margin:1rem 0 .75rem">🔍 放大檢視與候選比對</h3>
+      <div class="card">
+        <div class="card-title">放大檢視</div>
+        <p>點結果列的縮圖或 🔍 開啟檢視視窗，用來核對潦草的學號與分數：</p>
+        <ul>
+          <li>雙指縮放、單指拖曳；電腦可用滾輪縮放；快點兩下可放大／還原</li>
+          <li><kbd>↻ 旋轉</kbd> 轉正歪斜的照片；<kbd>◐ 增強對比</kbd> 讓淡字更清楚；<kbd>重設</kbd> 回到原狀</li>
+          <li>直接在視窗內修改學號、分數，按 <kbd>套用</kbd> 寫回結果列，或 <kbd>儲存並下一張</kbd> 連續處理</li>
+          <li>按 <kbd>✕ 關閉</kbd> 返回結果表格</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">學號辨識不完整時</div>
+        <p>即使 AI 有一兩碼看不清（顯示為 <code>?</code> 或讀錯），系統會依名冊中學號的格式，用其餘可辨識的碼去比對：</p>
+        <ul>
+          <li>只差 1 碼：自動選定最接近的學生，仍請核對姓名</li>
+          <li>差距較大或有多位相近：列出候選按鈕，由您點選</li>
+          <li>修改學號欄位後會立即重新比對</li>
+        </ul>
+      </div>
+
       <div class="card" style="margin-top:1rem">
         <div class="card-title">📌 考卷圖片拍攝建議</div>
         <ul>
@@ -620,6 +645,7 @@ footer {
           <li>光線充足，避免反光或陰影覆蓋文字</li>
           <li>拍攝角度盡量正面，減少透視失真</li>
           <li>分數填寫字跡要清楚，避免潦草</li>
+          <li>不必先縮小照片：系統上傳前會自動壓縮（長邊約 2000px），仍保留辨識所需細節</li>
         </ul>
       </div>
     </section>
@@ -765,9 +791,20 @@ footer {
           <ul style="padding-left:1rem;margin-top:.3rem">
             <li>清除瀏覽器快取或「清除所有網站資料」會導致資料遺失</li>
             <li>不同裝置、不同瀏覽器之間資料不會自動同步</li>
-            <li>建議定期點「📥 匯出 Excel」備份資料</li>
+            <li>請定期使用下方「🛟 資料備份與還原」備份</li>
           </ul>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🛟 資料備份與還原</div>
+        <p>位於「班級名冊」頁籤最下方，備份內容包含<strong>所有班級的名冊與成績</strong>。</p>
+        <ol style="padding-left:1.2rem;margin-top:.4rem">
+          <li>點「📤 備份到檔案」：iPhone 會開啟分享選單（可存到「檔案」、AirDrop、雲端硬碟）；電腦則直接下載 JSON 檔</li>
+          <li>換裝置或資料遺失時，點「📥 從檔案還原」並選取備份檔</li>
+          <li>確認提示後，備份內容會<strong>取代目前所有資料</strong></li>
+        </ol>
+        <p style="margin-top:.4rem">畫面會顯示上次備份時間，建議每次大量登分後備份一次。</p>
       </div>
 
       <div class="card">
@@ -798,7 +835,15 @@ footer {
       </div>
       <div class="card">
         <div class="card-title">❓ 名冊中找不到辨識到的學號？</div>
-        <p>可能是學號格式不符（例如辨識為純數字，但名冊中帶有英文字母前綴）。請在結果表格中修正學號後儲存，或直接在「✍️ 手動輸入」區域以末 3 碼搜尋補登。</p>
+        <p>先看該列是否有「候選」按鈕，點選最接近的學生即可。若沒有，可點 🔍 放大核對學號並修正，或在「✍️ 手動輸入」區域以末 3 碼搜尋補登。也請確認名冊學號格式與考卷一致（例如帶有英文字母前綴）。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">❓ 學號裡出現 <code>?</code> 是什麼意思？</div>
+        <p>代表 AI 看不清該位置的字元。系統會用其餘字元比對名冊，通常能自動找出學生；若不行，請放大檢視後手動補上。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">❓ 換手機或清除瀏覽器資料後，名冊不見了？</div>
+        <p>資料只存在該瀏覽器中。請事先在「班級名冊」頁籤使用「📤 備份到檔案」，之後用「📥 從檔案還原」即可復原全部班級。</p>
       </div>
       <div class="card">
         <div class="card-title">❓ 匯入 XLS 後出現「找不到學號或姓名欄位」？</div>
@@ -822,7 +867,7 @@ footer {
 </div>
 
 <footer>
-  成績掃描記錄系統 · AI 辨識版 &nbsp;|&nbsp; 使用說明 v1.0 &nbsp;|&nbsp; 2026
+  成績掃描記錄系統 · AI 辨識版 &nbsp;|&nbsp; 使用說明 v1.1 &nbsp;|&nbsp; 2026
 </footer>
 
 <script>
