@@ -306,6 +306,37 @@ self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Re
     /* mobile: show delete via edit button only */
   }
 
+
+  /* ===== Magnifier viewer ===== */
+  #viewer-overlay { display:none; position:fixed; inset:0; z-index:7500; background:#0b0f16;
+    flex-direction:column; color:#e6edf7; }
+  #viewer-overlay .vw-top { display:flex; align-items:center; gap:10px; padding:10px 12px;
+    padding-top:max(10px, env(safe-area-inset-top)); background:#121a26; border-bottom:1px solid #243247; }
+  #viewer-overlay .vw-title { flex:1; font-size:14px; font-weight:600; }
+  #viewer-overlay .vw-stage { flex:1; min-height:0; position:relative; overflow:hidden;
+    touch-action:none; display:flex; align-items:center; justify-content:center;
+    -webkit-user-select:none; user-select:none; cursor:grab; }
+  #viewer-overlay .vw-stage img { max-width:100%; max-height:100%; transform-origin:50% 50%;
+    will-change:transform; pointer-events:none; -webkit-user-drag:none; user-select:none; }
+  #viewer-overlay .vw-hint { position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
+    background:rgba(0,0,0,.55); color:#cfe0f7; font-size:11px; padding:3px 10px; border-radius:10px;
+    pointer-events:none; white-space:nowrap; }
+  #viewer-overlay .vw-panel { background:#121a26; border-top:1px solid #243247;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom)); max-height:46vh; overflow-y:auto;
+    display:flex; flex-direction:column; gap:8px; }
+  #viewer-overlay .vw-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  #viewer-overlay .vw-btn { height:34px; min-width:34px; padding:0 10px; border-radius:8px;
+    border:1px solid #2f4262; background:#1a2638; color:#dce8fa; font-size:13px; cursor:pointer; }
+  #viewer-overlay .vw-btn.on { background:#2a4f8f; border-color:#4a8ff5; }
+  #viewer-overlay .vw-btn.primary { background:#1a7a4a; border-color:#1a7a4a; color:#fff; font-weight:600; }
+  #viewer-overlay .vw-btn.cand { background:#2b2410; border-color:#7a5a10; color:#f0c060; height:32px; }
+  #viewer-overlay input[type=range] { flex:1; min-width:90px; height:30px; padding:0; border:none;
+    background:transparent; accent-color:#4a8ff5; }
+  #viewer-overlay .vw-input { height:40px; border-radius:8px; border:1px solid #2f4262;
+    background:#0b0f16; color:#fff; font-size:17px; padding:0 10px; text-align:center;
+    font-family:monospace; letter-spacing:.06em; }
+  #viewer-overlay .vw-lbl { font-size:12px; color:#8fa6c7; }
+
 </style>
 </head>
 <body>
@@ -394,6 +425,21 @@ self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Re
         </table>
       </div>
     </div>
+  </div>
+
+  <!-- Backup / restore (always visible) -->
+  <div class="section-card" id="backup-card">
+    <h2>🛟 資料備份與還原</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:.9rem;line-height:1.6">
+      成績只存在這個瀏覽器裡。清除網站資料、換手機或換瀏覽器都會遺失，建議每次登完成績就備份一次。</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-primary" onclick="backupData()">📤 備份到檔案</button>
+      <label class="btn btn-ghost" style="cursor:pointer">
+        📥 從檔案還原
+        <input type="file" id="restore-file" accept=".json,application/json" style="display:none" onchange="restoreData(this)">
+      </label>
+    </div>
+    <div id="backup-info" style="font-size:12px;color:var(--muted);margin-top:.7rem"></div>
   </div>
 </div>
 
@@ -893,19 +939,74 @@ const WORKER_URL = 'https://arcar.kftseng2oo1.workers.dev';
 let imageQueue = [];   // [{id, file, dataUrl, status, result}]
 let ocrResults = [];   // 辨識完成後的結果列表
 
-function loadImages(input) {
-  const files = Array.from(input.files);
-  if (!files.length) return;
-  files.forEach(file => {
-    const id = Date.now() + '_' + Math.random().toString(36).slice(2);
+/* ===== Image compression (long edge <= IMG_MAX_EDGE, JPEG) ===== */
+const IMG_MAX_EDGE = 2000;
+const IMG_JPEG_QUALITY = 0.88;
+
+function readAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = e => {
-      imageQueue.push({ id, file, dataUrl: e.target.result, status: 'pending', result: null });
-      renderQueue();
-    };
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('讀取圖片失敗'));
     reader.readAsDataURL(file);
   });
+}
+
+// Returns a (possibly smaller) JPEG data URL; falls back to the original on any problem.
+function compressImage(file) {
+  return readAsDataUrl(file).then(origUrl => new Promise(resolve => {
+    const img = new Image();
+    img.onload = function() {
+      try {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const long = Math.max(w, h);
+        // already small enough and light: keep as is
+        if (long <= IMG_MAX_EDGE && file.size < 400 * 1024) { resolve(origUrl); return; }
+        const scale = long > IMG_MAX_EDGE ? IMG_MAX_EDGE / long : 1;
+        const cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+        const cv = document.createElement('canvas');
+        cv.width = cw; cv.height = ch;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#ffffff';            // PNG transparency -> white, not black
+        ctx.fillRect(0, 0, cw, ch);
+        ctx.drawImage(img, 0, 0, cw, ch);
+        const out = cv.toDataURL('image/jpeg', IMG_JPEG_QUALITY);
+        // only use the result if it is valid and actually smaller
+        resolve(out && out.length > 100 && out.length < origUrl.length ? out : origUrl);
+      } catch (err) { resolve(origUrl); }
+    };
+    img.onerror = function() { resolve(origUrl); };
+    img.src = origUrl;
+  }));
+}
+
+async function loadImages(input) {
+  const files = Array.from(input.files || []);
+  if (!files.length) return;
   input.value = '';
+  setUploadBusy(true, files.length);
+  let n = 0;
+  for (const file of files) {
+    const id = Date.now() + '_' + Math.random().toString(36).slice(2);
+    try {
+      const dataUrl = await compressImage(file);
+      imageQueue.push({ id, file, dataUrl, status: 'pending', result: null });
+    } catch (err) {
+      console.warn('image load failed', file && file.name, err);
+    }
+    n++;
+    setUploadBusy(true, files.length, n);
+    renderQueue();
+  }
+  setUploadBusy(false);
+}
+
+function setUploadBusy(on, total, done) {
+  const el = document.getElementById('queue-summary');
+  if (!el) return;
+  if (on && total > 1 && done !== undefined && done < total) {
+    showToastMsg('處理圖片 ' + done + ' / ' + total);
+  }
 }
 
 function handleDrop(e) {
@@ -947,7 +1048,7 @@ function renderQueue() {
       ? `學號：${item.result.student_id || '?'}　分數：${item.result.score ?? '?'}`
       : (item.status === 'error' ? item.errorMsg || '辨識失敗' : '');
     return `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative">
-      <img src="${item.dataUrl}" style="width:100%;height:110px;object-fit:cover;display:block">
+      <img src="${item.dataUrl}" ${item.status==='done'?`onclick="openViewerByItem('${item.id}')"`:''} style="width:100%;height:110px;object-fit:cover;display:block;${item.status==='done'?'cursor:zoom-in':''}">
       <div style="padding:8px 10px">
         <div style="font-size:11px;color:${statusColor};font-weight:600;margin-bottom:3px">${statusIcon} ${item.status==='processing'?'辨識中...':item.status==='done'?'完成':item.status==='error'?'失敗':'等待中'}</div>
         <div style="font-size:11px;color:var(--muted);line-height:1.4">${resultText || item.file.name}</div>
@@ -967,9 +1068,66 @@ function setProgress(done, total) {
   document.getElementById('progress-label').textContent = `辨識中… ${done} / ${total} 張`;
 }
 
+/* ===== ID format helpers (derived from the current roster) ===== */
+function idFormatInfo() {
+  const ids = curStudents().map(s => String(s.id || '').toUpperCase().trim()).filter(Boolean);
+  if (!ids.length) return null;
+  const lens = Counter_(ids.map(x => x.length));
+  const len = lens.top;
+  const same = ids.filter(x => x.length === len);
+  if (same.length < Math.max(2, Math.floor(ids.length * 0.6))) return null;   // roster too irregular
+  let prefix = same[0];
+  for (const x of same) { while (!x.startsWith(prefix)) prefix = prefix.slice(0, -1); }
+  const restDigits = same.every(x => /^[0-9]+$/.test(x.slice(prefix.length)));
+  return { len, prefix, restDigits, example: same[0] };
+}
+function Counter_(arr) {
+  const m = {}; let top = null, best = 0;
+  arr.forEach(v => { m[v] = (m[v] || 0) + 1; if (m[v] > best) { best = m[v]; top = v; } });
+  return { top, count: best };
+}
+
+function describeIdFormat() {
+  const f = idFormatInfo();
+  if (!f) return '';
+  let s = '本班學號共 ' + f.len + ' 碼';
+  if (f.prefix) s += '，前 ' + f.prefix.length + ' 碼固定為「' + f.prefix + '」';
+  if (f.restDigits) s += '，其餘 ' + (f.len - f.prefix.length) + ' 碼一定是數字 0-9（不會有英文字母或符號）';
+  s += '（格式範例：' + f.example + '）。';
+  return s;
+}
+
+// Clean up an OCR'd ID using the roster's format. Unknown characters become '?'.
+function normalizeOcrId(raw) {
+  let id = String(raw == null ? '' : raw).toUpperCase().replace(/[\s\-_.]/g, '');
+  const f = idFormatInfo();
+  if (!f || id.length !== f.len) return id;
+  const look = { 'O': '0', 'Q': '0', 'I': '1', 'L': '1', '|': '1', 'Z': '2', 'S': '5', 'G': '6', 'B': '8' };
+  let out = '';
+  for (let i = 0; i < id.length; i++) {
+    const ch = id[i];
+    // letters in the prefix are kept exactly as read (a wrong letter should surface, not be hidden)
+    const expectDigit = i < f.prefix.length ? /[0-9]/.test(f.prefix[i]) : f.restDigits;
+    if (expectDigit) out += /[0-9]/.test(ch) ? ch : (look[ch] || '?');
+    else out += ch;
+  }
+  return out;
+}
+
 async function ocrOneImage(item) {
   const base64 = item.dataUrl.split(',')[1];
   const mediaType = item.dataUrl.split(';')[0].split(':')[1];
+  const fmt = describeIdFormat();
+  const prompt =
+    '這是一張考卷第一頁的照片。請找出兩個資訊：\n' +
+    '1.「學號」：位於「學號:」旁的一排方格內，是手寫的英文字母加數字。\n' +
+    '2.「分數」：位於「分數」方框內，是老師手寫批改的總分，應為 0 到 100 的數字。\n\n' +
+    (fmt ? fmt + '\n' : '') +
+    '手寫辨識注意：數字 1 可能帶上勾、7 可能帶橫槓、0 可能帶斜線；' +
+    '不要把數字誤讀成 & 或其他符號。若某一碼真的看不清楚，請以 ? 代替，不要亂猜，並在 notes 說明是第幾碼。\n\n' +
+    '只回覆 JSON，格式：\n' +
+    '{"student_id":"學號","score":分數數字或null,"confidence":"high|medium|low","notes":"備註"}';
+
   const res = await fetch(WORKER_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -978,16 +1136,34 @@ async function ocrOneImage(item) {
       max_tokens: 300,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-        { type: 'text', text: `請仔細分析這張考卷圖片，找出「學號」欄位的數字和「分數」方框裡的數字。
-請只回覆 JSON，格式如下：
-{"student_id":"學號字串","score":分數數字,"confidence":"high/medium/low","notes":"備註"}
-找不到分數時 score 填 null，看不清楚時 confidence 填 low。` }
+        { type: 'text', text: prompt }
       ]}]
     })
   });
+  if (!res.ok) throw new Error('伺服器回應 ' + res.status);
   const data = await res.json();
-  const text = (data.content?.[0]?.text || '').replace(/```json|```/g, '').trim();
-  return JSON.parse(text);
+  if (data && data.error) throw new Error(typeof data.error === 'string' ? data.error : (data.error.message || '辨識服務錯誤'));
+  const raw = (data.content && data.content[0] && data.content[0].text) || '';
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('無法解析辨識結果');
+  const parsed = JSON.parse(m[0]);
+
+  // post-processing
+  parsed.student_id = normalizeOcrId(parsed.student_id);
+  let sc = parsed.score;
+  if (sc !== null && sc !== undefined && sc !== '') {
+    sc = parseFloat(sc);
+    if (isNaN(sc) || sc < 0 || sc > 100) {
+      parsed.notes = ((parsed.notes || '') + ' 分數超出 0-100，請人工確認').trim();
+      parsed.confidence = 'low';
+      sc = null;
+    }
+    parsed.score = sc;
+  } else {
+    parsed.score = null;
+  }
+  if (/\?/.test(parsed.student_id) && parsed.confidence === 'high') parsed.confidence = 'medium';
+  return parsed;
 }
 
 async function runBatchOCR() {
@@ -1033,6 +1209,190 @@ async function runBatchOCR() {
 }
 
 
+/* ===== Magnifier viewer ===== */
+const VW = { idx:-1, s:1, tx:0, ty:0, rot:0, enhance:false, pointers:new Map(),
+             lastDist:0, lastMid:null, lastTap:0, moved:false, hits:[], bound:false };
+function vwEl(id) { return document.getElementById(id); }
+
+function openViewerByItem(itemId) {
+  const i = ocrResults.findIndex(r => r.item.id === itemId);
+  if (i >= 0) openViewer(i);
+}
+
+function openViewer(idx) {
+  const r = ocrResults[idx];
+  if (!r) return;
+  bindViewerOnce();
+  VW.idx = idx;
+  vwEl('vw-img').src = r.item.dataUrl;
+  vwEl('vw-id').value = r.editId || '';
+  vwEl('vw-score').value = (r.editScore === '' || r.editScore == null) ? '' : r.editScore;
+  vwEl('vw-pos').textContent = (idx + 1) + ' / ' + ocrResults.length;
+  vwEl('vw-title').textContent = '放大檢視 · ' + EXAM_NAMES[currentExamType];
+  viewerReset();
+  viewerHints();
+  vwEl('viewer-overlay').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeViewer() {
+  vwEl('viewer-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+  VW.pointers.clear();
+}
+
+function viewerApplyTransform() {
+  const img = vwEl('vw-img');
+  img.style.transform = 'translate(' + VW.tx + 'px,' + VW.ty + 'px) scale(' + VW.s + ') rotate(' + VW.rot + 'deg)';
+  img.style.filter = VW.enhance ? 'grayscale(1) contrast(1.7) brightness(1.1)' : 'none';
+  vwEl('vw-zoom').value = Math.min(8, Math.max(1, VW.s));
+  vwEl('vw-zoom-label').textContent = VW.s.toFixed(1) + '×';
+  vwEl('vw-enh').classList.toggle('on', VW.enhance);
+}
+
+function viewerReset() {
+  VW.s = 1; VW.tx = 0; VW.ty = 0; VW.rot = 0;
+  viewerApplyTransform();
+}
+
+function viewerZoomAt(px, py, ratio) {
+  const st = vwEl('vw-stage').getBoundingClientRect();
+  const cx = st.left + st.width / 2, cy = st.top + st.height / 2;
+  const ns = Math.min(10, Math.max(0.5, VW.s * ratio));
+  const k = ns / VW.s;
+  VW.tx = (px - cx) - ((px - cx) - VW.tx) * k;
+  VW.ty = (py - cy) - ((py - cy) - VW.ty) * k;
+  VW.s = ns;
+  viewerApplyTransform();
+}
+
+function viewerSetZoom(v) {
+  const st = vwEl('vw-stage').getBoundingClientRect();
+  viewerZoomAt(st.left + st.width / 2, st.top + st.height / 2, v / VW.s);
+}
+function viewerStep(d) { viewerSetZoom(Math.min(10, Math.max(0.5, VW.s + d))); }
+function viewerRotate() { VW.rot = (VW.rot + 90) % 360; viewerApplyTransform(); }
+function viewerToggleEnhance() { VW.enhance = !VW.enhance; viewerApplyTransform(); }
+
+function bindViewerOnce() {
+  if (VW.bound) return;
+  VW.bound = true;
+  const st = vwEl('vw-stage');
+
+  st.addEventListener('pointerdown', function(e) {
+    if (st.setPointerCapture) { try { st.setPointerCapture(e.pointerId); } catch(err) {} }
+    VW.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    VW.moved = false;
+    if (VW.pointers.size === 2) {
+      const p = Array.from(VW.pointers.values());
+      VW.lastDist = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      VW.lastMid = { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 };
+    }
+  });
+
+  st.addEventListener('pointermove', function(e) {
+    if (!VW.pointers.has(e.pointerId)) return;
+    const prev = VW.pointers.get(e.pointerId);
+    VW.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (VW.pointers.size === 1) {
+      const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+      VW.tx += dx; VW.ty += dy;
+      if (Math.abs(dx) + Math.abs(dy) > 2) VW.moved = true;
+      viewerApplyTransform();
+    } else if (VW.pointers.size === 2) {
+      const p = Array.from(VW.pointers.values());
+      const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      const mid = { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 };
+      if (VW.lastDist > 0) viewerZoomAt(mid.x, mid.y, d / VW.lastDist);
+      if (VW.lastMid) { VW.tx += mid.x - VW.lastMid.x; VW.ty += mid.y - VW.lastMid.y; }
+      VW.lastDist = d; VW.lastMid = mid; VW.moved = true;
+      viewerApplyTransform();
+    }
+  });
+
+  function endPointer(e) {
+    VW.pointers.delete(e.pointerId);
+    if (VW.pointers.size === 0 && !VW.moved && e.type === 'pointerup') {
+      const now = Date.now();
+      if (now - VW.lastTap < 300) {
+        if (VW.s > 1.2) viewerReset();
+        else viewerZoomAt(e.clientX, e.clientY, 3 / VW.s);
+        VW.lastTap = 0;
+      } else {
+        VW.lastTap = now;
+      }
+    }
+  }
+  st.addEventListener('pointerup', endPointer);
+  st.addEventListener('pointercancel', endPointer);
+
+  st.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    viewerZoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.15 : 1 / 1.15);
+  }, { passive: false });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && vwEl('viewer-overlay').style.display === 'flex') closeViewer();
+  });
+}
+
+function viewerHints() {
+  const val = vwEl('vw-id').value.trim();
+  const box = vwEl('vw-hints');
+  VW.hits = fuzzyMatchId(val);
+  if (!val) { box.innerHTML = '<span class="vw-lbl">請輸入或修正學號</span>'; return; }
+  if (!VW.hits.length) { box.innerHTML = '<span class="vw-lbl" style="color:#f08070">名冊中找不到相近的學號</span>'; return; }
+  if (VW.hits[0].dist === 0) {
+    box.innerHTML = '<span style="color:#5fd394;font-size:14px;font-weight:600">✓ ' + VW.hits[0].student.name + '</span>';
+    return;
+  }
+  box.innerHTML = '<span class="vw-lbl">相近：</span>' + VW.hits.map(function(h, i) {
+    return '<button class="vw-btn cand" onclick="viewerPick(' + i + ')">' + h.student.name + ' ' + h.student.id +
+           ' <span style="opacity:.6">差' + h.dist + '碼</span></button>';
+  }).join('');
+}
+
+function viewerPick(i) {
+  const h = VW.hits[i];
+  if (!h) return;
+  vwEl('vw-id').value = h.student.id;
+  viewerHints();
+}
+
+function viewerApply() {
+  const r = ocrResults[VW.idx];
+  if (!r) return;
+  r.editId = vwEl('vw-id').value.trim();
+  const sc = parseFloat(vwEl('vw-score').value);
+  r.editScore = isNaN(sc) ? '' : sc;
+  const row = document.getElementById('rrow-' + VW.idx);
+  if (row) {
+    const t = row.querySelector('input[type=text]');
+    if (t) t.value = r.editId;
+    const n = row.querySelector('input[type=number]');
+    if (n) n.value = r.editScore;
+  }
+  reMatchResult(VW.idx);
+  viewerHints();
+}
+
+function viewerNav(d) {
+  const ni = VW.idx + d;
+  if (ni < 0 || ni >= ocrResults.length) return;
+  viewerApply();
+  openViewer(ni);
+}
+
+async function viewerSaveNext() {
+  viewerApply();
+  const idx = VW.idx;
+  await saveSingleResult(idx);
+  if (ocrResults[idx] && ocrResults[idx].saved) {
+    if (idx < ocrResults.length - 1) openViewer(idx + 1);
+    else closeViewer();
+  }
+}
+
 function selectFuzzyMatch(idx, hitIdx) {
   const r = ocrResults[idx];
   if (hitIdx === -1) {
@@ -1066,7 +1426,7 @@ function renderResults() {
       ? '<span style="color:var(--success);font-weight:600">✅ 已儲存</span>'
       : '<span style="color:var(--muted)">待儲存</span>';
     return `<tr id="rrow-${idx}">
-      <td><img src="${r.item.dataUrl}" style="width:64px;height:44px;object-fit:cover;border-radius:5px;border:1px solid var(--border)"></td>
+      <td><div onclick="openViewer(${idx})" style="position:relative;cursor:zoom-in;width:64px"><img src="${r.item.dataUrl}" style="width:64px;height:44px;object-fit:cover;border-radius:5px;border:1px solid var(--border);display:block"><span style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.65);color:#fff;border-radius:4px;font-size:10px;padding:0 3px">🔍</span></div></td>
       <td><input type="text" value="${r.editId}" style="width:110px;height:30px;font-family:monospace;font-size:13px;text-align:center;border:1px solid var(--border);border-radius:6px;padding:0 6px"
         onchange="ocrResults[${idx}].editId=this.value;reMatchResult(${idx})"></td>
       <td id="rmatch-${idx}"></td>
@@ -1336,6 +1696,7 @@ function saveToLS() {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify({ classes, currentClassId }));
     showToast();
+    updateBackupInfo();
   } catch(e) { console.warn('LS save failed', e); }
 }
 
@@ -1360,14 +1721,111 @@ function loadFromLS() {
 }
 
 let _toastTimer = null;
-function showToast() {
+function showToastMsg(msg, ms) {
   const t = document.getElementById('save-toast');
+  if (!t) return;
+  t.textContent = msg;
   t.classList.add('show');
   clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), ms || 1800);
 }
+function showToast() { showToastMsg('💾 已自動儲存'); }
 
 // class info now stored in classes[] object, no separate inputs
+
+/* ===== Backup / Restore ===== */
+const LS_BACKUP_KEY = 'gradeApp_lastBackup';
+
+function updateBackupInfo() {
+  const el = document.getElementById('backup-info');
+  if (!el) return;
+  let last = null;
+  try { last = localStorage.getItem(LS_BACKUP_KEY); } catch (e) {}
+  const total = classes.reduce((n, cl) => n + (cl.students ? cl.students.length : 0), 0);
+  el.textContent = '目前共 ' + classes.length + ' 個班級、' + total + ' 位學生。' +
+    (last ? '上次備份：' + new Date(last).toLocaleString('zh-TW') : '尚未備份過。');
+}
+
+async function backupData() {
+  if (!classes.length) { showToastMsg('目前沒有資料可備份', 2200); return; }
+  const payload = {
+    app: 'grade-scanner', version: 1,
+    exportedAt: new Date().toISOString(),
+    currentClassId, classes
+  };
+  const text = JSON.stringify(payload, null, 1);
+  const name = '成績備份_' + new Date().toISOString().slice(0, 10) + '.json';
+  const blob = new Blob([text], { type: 'application/json' });
+  let done = false;
+  try {
+    // iOS: use the share sheet so the file can be saved to Files / AirDrop / LINE
+    const file = new File([blob], name, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: name });
+      done = true;
+    }
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;   // user closed the share sheet
+  }
+  if (!done) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+  try { localStorage.setItem(LS_BACKUP_KEY, new Date().toISOString()); } catch (e) {}
+  updateBackupInfo();
+  showToastMsg('✅ 已產生備份檔', 2200);
+}
+
+function sanitizeRestored(data) {
+  if (!data || !Array.isArray(data.classes)) throw new Error('不是有效的備份檔');
+  const num = v => (v === null || v === undefined || v === '' || isNaN(parseFloat(v))) ? null : parseFloat(v);
+  const out = data.classes.map((cl, i) => {
+    if (!cl || typeof cl !== 'object') throw new Error('班級資料格式錯誤');
+    return {
+      id: String(cl.id || ('cls_r' + Date.now() + '_' + i)),
+      name: String(cl.name || ('班級' + (i + 1))),
+      subject: String(cl.subject || ''), teacher: String(cl.teacher || ''), semester: String(cl.semester || ''),
+      students: (Array.isArray(cl.students) ? cl.students : [])
+        .filter(s => s && s.id && s.name)
+        .map((s, k) => ({
+          id: String(s.id), name: String(s.name),
+          seat: parseInt(s.seat) || (k + 1),
+          scoreA: num(s.scoreA), scoreB: num(s.scoreB), scoreC: num(s.scoreC)
+        }))
+    };
+  });
+  return { classes: out, currentClassId: data.currentClassId };
+}
+
+function restoreData(input) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    let restored;
+    try { restored = sanitizeRestored(JSON.parse(e.target.result)); }
+    catch (err) { showToastMsg('❌ 還原失敗：' + err.message, 3200); return; }
+    const sc = restored.classes.length;
+    const st = restored.classes.reduce((n, cl) => n + cl.students.length, 0);
+    const hasData = classes.some(cl => cl.students.length);
+    const ok = await showConfirm('還原備份',
+      '備份檔內有 ' + sc + ' 個班級、' + st + ' 位學生。' +
+      (hasData ? '還原後會取代目前所有資料。' : ''), '還原');
+    if (!ok) return;
+    classes = restored.classes;
+    currentClassId = classes.some(cl => cl.id === restored.currentClassId)
+      ? restored.currentClassId : (classes.length ? classes[0].id : null);
+    renderSidebar(); renderClassPanel(); renderRoster(); updateCounts(); renderGrades(); updateBackupInfo();
+    saveToLS();
+    showToastMsg('✅ 已還原 ' + sc + ' 個班級', 2400);
+  };
+  reader.onerror = () => showToastMsg('❌ 讀取檔案失敗', 3000);
+  reader.readAsText(file, 'UTF-8');
+}
 
 /* ===== Dark Mode ===== */
 function applyTheme(theme) {
@@ -1413,6 +1871,7 @@ function toggleTheme() {
   renderClassPanel();
   renderRoster();
   updateCounts();
+  updateBackupInfo();
 })();
 </script>
 
@@ -1445,6 +1904,51 @@ function toggleTheme() {
       <span style="flex:1"></span>
       <button class="btn btn-ghost" onclick="closeClassModal()">取消</button>
       <button class="btn btn-primary" onclick="saveClassModal()">儲存</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Magnifier viewer -->
+<div id="viewer-overlay">
+  <div class="vw-top">
+    <button class="vw-btn" onclick="closeViewer()">✕ 關閉</button>
+    <div class="vw-title" id="vw-title">放大檢視</div>
+  </div>
+  <div class="vw-stage" id="vw-stage">
+    <img id="vw-img" alt="">
+    <div class="vw-hint">雙指縮放 · 拖曳移動 · 連點兩下放大</div>
+  </div>
+  <div class="vw-panel">
+    <div class="vw-row">
+      <button class="vw-btn" onclick="viewerStep(-0.5)">－</button>
+      <input type="range" id="vw-zoom" min="1" max="8" step="0.1" value="1" oninput="viewerSetZoom(parseFloat(this.value))">
+      <button class="vw-btn" onclick="viewerStep(0.5)">＋</button>
+      <span class="vw-lbl" id="vw-zoom-label" style="min-width:38px">1.0×</span>
+    </div>
+    <div class="vw-row">
+      <button class="vw-btn" onclick="viewerSetZoom(2)">2×</button>
+      <button class="vw-btn" onclick="viewerSetZoom(3)">3×</button>
+      <button class="vw-btn" onclick="viewerSetZoom(5)">5×</button>
+      <button class="vw-btn" onclick="viewerRotate()">↻ 旋轉</button>
+      <button class="vw-btn" id="vw-enh" onclick="viewerToggleEnhance()">◐ 增強對比</button>
+      <button class="vw-btn" onclick="viewerReset()">重設</button>
+    </div>
+    <div class="vw-row">
+      <span class="vw-lbl">學號</span>
+      <input type="text" id="vw-id" class="vw-input" style="flex:1;min-width:130px;width:auto"
+        autocapitalize="characters" autocomplete="off" oninput="viewerHints()">
+      <span class="vw-lbl">分數</span>
+      <input type="number" id="vw-score" class="vw-input" style="width:84px" min="0" max="100" inputmode="decimal">
+    </div>
+    <div class="vw-row" id="vw-hints" style="min-height:32px"></div>
+    <div class="vw-row">
+      <button class="vw-btn" onclick="viewerNav(-1)">◀</button>
+      <span class="vw-lbl" id="vw-pos"></span>
+      <button class="vw-btn" onclick="viewerNav(1)">▶</button>
+      <span style="flex:1"></span>
+      <button class="vw-btn" onclick="viewerApply()">套用</button>
+      <button class="vw-btn primary" onclick="viewerSaveNext()">儲存並下一張</button>
     </div>
   </div>
 </div>

@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>成績掃描記錄系統 — 使用說明</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --navy:    #0d2240;
+  --blue:    #1a4fa0;
+  --sky:     #4a8ff5;
+  --gold:    #e8a020;
+  --gold-lt: #fff3d6;
+  --green:   #1a7a4a;
+  --green-lt:#e6f4ea;
+  --red:     #c0392b;
+  --ink:     #1c2b45;
+  --body:    #3a4a60;
+  --muted:   #6b7a94;
+  --border:  #dde4f0;
+  --bg:      #f7f9fc;
+  --white:   #ffffff;
+  --radius:  12px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Noto Sans TC', sans-serif;
+  background: var(--bg);
+  color: var(--body);
+  line-height: 1.75;
+  font-size: 15px;
+}
+
+/* ── cover ── */
+.cover {
+  background: var(--navy);
+  color: #fff;
+  padding: 4rem 2rem 3rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.cover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 60%, rgba(74,143,245,0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 80% 30%, rgba(232,160,32,0.12) 0%, transparent 70%);
+}
+.cover-icon {
+  width: 80px; height: 80px;
+  background: rgba(255,255,255,0.08);
+  border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1.5rem;
+  font-size: 36px;
+  position: relative;
+}
+.cover h1 {
+  font-family: 'Noto Serif TC', serif;
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  font-weight: 700;
+  letter-spacing: .04em;
+  margin-bottom: .5rem;
+  position: relative;
+}
+.cover .subtitle {
+  font-size: 14px;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: .06em;
+  position: relative;
+}
+.cover-tags {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  justify-content: center; margin-top: 1.5rem;
+  position: relative;
+}
+.cover-tag {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.8);
+}
+
+/* ── nav sidebar ── */
+.layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  max-width: 1100px;
+  margin: 0 auto;
+  gap: 0;
+}
+.toc {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 2rem 1rem 2rem 1.5rem;
+  border-right: 1px solid var(--border);
+  background: var(--white);
+}
+.toc h3 {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+.toc a {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 8px;
+  text-decoration: none; font-size: 13px;
+  color: var(--body); margin-bottom: 2px;
+  transition: background .12s, color .12s;
+}
+.toc a:hover { background: var(--bg); color: var(--blue); }
+.toc a.active { background: #e8f0fe; color: var(--blue); font-weight: 500; }
+.toc-icon { font-size: 14px; width: 18px; text-align: center; }
+
+.content { padding: 3rem 2.5rem; }
+
+/* ── section ── */
+.section { margin-bottom: 4rem; }
+.section-header {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border);
+}
+.section-num {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--blue); color: #fff;
+  font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.section-header h2 {
+  font-family: 'Noto Serif TC', serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ── cards ── */
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.card-title {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 14px;
+  margin-bottom: .5rem;
+  display: flex; align-items: center; gap: 8px;
+}
+.card p, .card li { font-size: 14px; color: var(--body); }
+.card ul, .card ol { padding-left: 1.2rem; }
+.card li { margin-bottom: 4px; }
+
+/* step cards */
+.steps { display: flex; flex-direction: column; gap: 0; }
+.step {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 0 1rem;
+  position: relative;
+}
+.step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 21px; top: 44px; bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.step-num {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  font-weight: 700; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; z-index: 1;
+}
+.step-body {
+  padding-bottom: 1.5rem;
+}
+.step-body h4 { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 4px; margin-top: 10px; }
+.step-body p, .step-body li { font-size: 13px; color: var(--body); }
+.step-body ul { padding-left: 1.1rem; }
+.step-body li { margin-bottom: 3px; }
+
+/* tip / warn / note boxes */
+.tip, .warn, .note {
+  border-radius: 10px;
+  padding: .9rem 1.1rem;
+  font-size: 13px;
+  margin-bottom: 1rem;
+  display: flex; gap: 10px;
+  align-items: flex-start;
+}
+.tip  { background: var(--green-lt); border-left: 3px solid var(--green); color: #0d4028; }
+.warn { background: var(--gold-lt);  border-left: 3px solid var(--gold);  color: #5a3800; }
+.note { background: #e8f0fe;         border-left: 3px solid var(--sky);   color: #0d2e6a; }
+.tip-icon, .warn-icon, .note-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+/* badge */
+.badge {
+  display: inline-block;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.badge-blue  { background: #dbeafe; color: #1d4ed8; }
+.badge-green { background: var(--green-lt); color: var(--green); }
+.badge-gold  { background: var(--gold-lt);  color: #92600a; }
+.badge-red   { background: #fee2e2; color: var(--red); }
+
+/* kbd */
+kbd {
+  background: var(--ink);
+  color: #fff;
+  border-radius: 5px;
+  padding: 1px 7px;
+  font-size: 12px;
+  font-family: monospace;
+  letter-spacing: .03em;
+}
+
+/* flow diagram */
+.flow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+.flow-box {
+  background: var(--white);
+  border: 1.5px solid var(--blue);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--blue);
+  text-align: center;
+  min-width: 80px;
+}
+.flow-arrow {
+  font-size: 18px;
+  color: var(--muted);
+  padding: 0 6px;
+}
+
+/* two-col grid */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* table */
+.mtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 1rem;
+}
+.mtable th {
+  background: var(--bg);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1.5px solid var(--border);
+}
+.mtable td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.mtable tr:last-child td { border-bottom: none; }
+
+/* score legend */
+.grade-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: .5rem; }
+.grade-pill {
+  display: flex; align-items: center; gap: 6px;
+  border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 600;
+}
+
+/* footer */
+footer {
+  text-align: center;
+  padding: 2rem;
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  margin-top: 2rem;
+}
+
+@media (max-width: 720px) {
+  .layout { grid-template-columns: 1fr; }
+  .toc { display: none; }
+  .content { padding: 1.5rem 1rem; }
+  .grid2 { grid-template-columns: 1fr; }
+  .flow { flex-direction: column; align-items: flex-start; }
+  .flow-arrow { transform: rotate(90deg); }
+}
+</style>
+</head>
+<body>
+
+<!-- Cover -->
+<div class="cover">
+  <div class="cover-icon">📋</div>
+  <h1>成績掃描記錄系統</h1>
+  <p class="subtitle">AI GRADE SCANNER · 使用說明手冊</p>
+  <div class="cover-tags">
+    <span class="cover-tag">多班級管理</span>
+    <span class="cover-tag">AI 圖像辨識</span>
+    <span class="cover-tag">批次上傳</span>
+    <span class="cover-tag">Excel 匯出</span>
+    <span class="cover-tag">離線儲存</span>
+    <span class="cover-tag">暗黑模式</span>
+  </div>
+</div>
+
+<!-- Body layout -->
+<div class="layout">
+
+  <!-- TOC sidebar -->
+  <nav class="toc">
+    <h3>目錄</h3>
+    <a href="#sec-overview" class="toc-link"><span class="toc-icon">🗺</span>系統概覽</a>
+    <a href="#sec-start"    class="toc-link"><span class="toc-icon">🚀</span>快速開始</a>
+    <a href="#sec-class"    class="toc-link"><span class="toc-icon">🏫</span>班級管理</a>
+    <a href="#sec-roster"   class="toc-link"><span class="toc-icon">📋</span>建立名冊</a>
+    <a href="#sec-scan"     class="toc-link"><span class="toc-icon">📷</span>掃描辨識</a>
+    <a href="#sec-manual"   class="toc-link"><span class="toc-icon">✍️</span>手動輸入</a>
+    <a href="#sec-grades"   class="toc-link"><span class="toc-icon">📊</span>成績總覽</a>
+    <a href="#sec-export"   class="toc-link"><span class="toc-icon">📥</span>匯出 Excel</a>
+    <a href="#sec-settings" class="toc-link"><span class="toc-icon">⚙️</span>設定與儲存</a>
+    <a href="#sec-faq"      class="toc-link"><span class="toc-icon">❓</span>常見問題</a>
+  </nav>
+
+  <!-- Main content -->
+  <main class="content">
+
+    <!-- 0. Overview -->
+    <section class="section" id="sec-overview">
+      <div class="section-header">
+        <div class="section-num">0</div>
+        <h2>系統概覽</h2>
+      </div>
+      <p style="margin-bottom:1rem">本系統是專為教師設計的 <strong>AI 輔助成績登錄工具</strong>，可透過拍照辨識考卷上的學號與分數，自動比對名冊後一鍵儲存，大幅節省逐張翻閱、手動輸入的時間。</p>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title">🗂 三大功能頁籤</div>
+          <ul>
+            <li><strong>班級名冊</strong> — 管理班級與學生資料</li>
+            <li><strong>掃描辨識</strong> — 上傳考卷圖片進行 AI 分析</li>
+            <li><strong>成績總覽</strong> — 檢視所有成績並匯出</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">💾 資料安全</div>
+          <ul>
+            <li>所有資料儲存在本機瀏覽器（LocalStorage）</li>
+            <li>重新整理後資料不會消失</li>
+            <li>不需要後端伺服器</li>
+            <li>AI 辨識透過 Cloudflare Worker 代理</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note">
+        <span class="note-icon">ℹ️</span>
+        <span>本系統為單一 HTML 檔案，無需安裝，直接用瀏覽器開啟即可使用。建議部署至 GitHub Pages 後在手機加入主畫面，作為 PWA 使用。</span>
+      </div>
+    </section>
+
+    <!-- 1. Quick Start -->
+    <section class="section" id="sec-start">
+      <div class="section-header">
+        <div class="section-num">1</div>
+        <h2>快速開始</h2>
+      </div>
+
+      <div class="flow">
+        <div class="flow-box">新增班級</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box">匯入名冊</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box">上傳考卷</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box">確認成績</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box">匯出 Excel</div>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <h4>新增班級</h4>
+            <p>點選班級列表下方「＋ 新增班級」，填入班級名稱（必填）、科目、教師、學年學期後儲存。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <h4>匯入學生名冊</h4>
+            <p>點「匯入名冊」上傳 XLS / XLSX / CSV 檔案。系統自動識別學號、姓名、順序欄位。<br>
+            也可手動逐筆輸入學號與姓名。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <h4>選擇考試類別</h4>
+            <p>切換至「📷 掃描辨識」頁籤，先點選上方按鈕選擇要登入的考試：<br>
+            <kbd>平時考核</kbd> <kbd>期中考試</kbd> <kbd>期末考試</kbd></p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <h4>上傳考卷並辨識</h4>
+            <p>點選上傳區域選取圖片（可一次選多張），點「🔍 開始批次辨識」，AI 自動讀取學號與分數。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-body">
+            <h4>確認並儲存</h4>
+            <p>確認辨識結果表格無誤後，點「💾 全部儲存到名冊」，或逐筆點「儲存」。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">6</div>
+          <div class="step-body">
+            <h4>匯出 Excel</h4>
+            <p>切至「📊 成績總覽」，點「📥 匯出 Excel」，下載完整成績表（格式與教務系統相容）。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Class Management -->
+    <section class="section" id="sec-class">
+      <div class="section-header">
+        <div class="section-num">2</div>
+        <h2>班級管理</h2>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🖥 桌機版（瀏覽器寬度 ≥ 700px）</div>
+        <p>左側顯示班級清單。每個班級顯示名稱與人數，滑鼠移上去出現 <kbd>×</kbd> 刪除按鈕。點選班級即切換。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📱 手機版（瀏覽器寬度 ＜ 700px）</div>
+        <p>頂部顯示橫向班級卡片列，左右滑動切換班級。當前班級有藍色邊框標示。<br>
+        手機上刪除班級請點「✏️ 編輯班級資訊」→「🗑 刪除此班」。</p>
+      </div>
+
+      <table class="mtable">
+        <thead><tr><th>操作</th><th>方法</th></tr></thead>
+        <tbody>
+          <tr><td><strong>新增班級</strong></td><td>點「＋ 新增班級」，填寫班級名稱等資訊後儲存</td></tr>
+          <tr><td><strong>切換班級</strong></td><td>點選班級名稱（桌機左側清單 / 手機頂部卡片）</td></tr>
+          <tr><td><strong>編輯班級資訊</strong></td><td>點「✏️ 編輯班級資訊」修改名稱、科目、教師等</td></tr>
+          <tr><td><strong>刪除班級</strong></td><td>桌機：清單 × 按鈕；手機：編輯視窗內「🗑 刪除此班」</td></tr>
+          <tr><td><strong>匯入名冊自動建班</strong></td><td>直接匯入 XLS 檔，系統以<strong>檔案名稱</strong>自動建立新班級</td></tr>
+        </tbody>
+      </table>
+
+      <div class="tip">
+        <span class="tip-icon">💡</span>
+        <span>每位老師可建立多個班級，各班的名冊與成績完全獨立互不干擾。</span>
+      </div>
+    </section>
+
+    <!-- 3. Roster -->
+    <section class="section" id="sec-roster">
+      <div class="section-header">
+        <div class="section-num">3</div>
+        <h2>建立學生名冊</h2>
+      </div>
+
+      <h3 style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:.75rem">方法一：匯入 XLS / XLSX / CSV</h3>
+      <div class="card">
+        <p>點「📥 匯入名冊」選擇檔案，支援三種格式。系統自動識別以下欄位：</p>
+        <div style="margin-top:.75rem">
+          <table class="mtable">
+            <thead><tr><th>欄位名稱</th><th>說明</th><th>必填</th></tr></thead>
+            <tbody>
+              <tr><td><code>順序</code></td><td>座號或順序號</td><td>選填（可自動補號）</td></tr>
+              <tr><td><code>學號</code></td><td>學生學號</td><td><span class="badge badge-red">必填</span></td></tr>
+              <tr><td><code>姓名</code></td><td>學生姓名</td><td><span class="badge badge-red">必填</span></td></tr>
+              <tr><td><code>平時考核</code></td><td>已有成績則自動匯入</td><td>選填</td></tr>
+              <tr><td><code>期中考試</code></td><td>已有成績則自動匯入</td><td>選填</td></tr>
+              <tr><td><code>期末考試</code></td><td>已有成績則自動匯入</td><td>選填</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3 style="font-size:14px;font-weight:600;color:var(--ink);margin:.75rem 0">方法二：手動逐筆輸入</h3>
+      <div class="card">
+        <ul>
+          <li>填入學號、姓名、順序號後按 <kbd>Enter</kbd> 或點「＋ 新增」</li>
+          <li>欄位間可用 <kbd>Enter</kbd> 快速跳到下一格</li>
+          <li>同一學號不可重複新增</li>
+        </ul>
+      </div>
+
+      <h3 style="font-size:14px;font-weight:600;color:var(--ink);margin:.75rem 0">名冊操作</h3>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title">🔍 搜尋</div>
+          <p>在搜尋框輸入學號或姓名即時過濾清單</p>
+        </div>
+        <div class="card">
+          <div class="card-title">⇅ 排序</div>
+          <p>點「⇅ 排序」按順序號升序 / 降序切換</p>
+        </div>
+        <div class="card">
+          <div class="card-title">🗑 清空名冊</div>
+          <p>刪除當前班級所有學生（需確認），不影響其他班級</p>
+        </div>
+        <div class="card">
+          <div class="card-title">刪除單一學生</div>
+          <p>點每列末端的「刪除」按鈕，彈出確認視窗後移除</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Scan -->
+    <section class="section" id="sec-scan">
+      <div class="section-header">
+        <div class="section-num">4</div>
+        <h2>AI 掃描辨識</h2>
+      </div>
+
+      <div class="warn">
+        <span class="warn-icon">⚠️</span>
+        <span>掃描辨識前請先確認左上方已選取正確班級，並在頁籤內選好考試類別（平時／期中／期末）。</span>
+      </div>
+
+      <h3 style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:.75rem">📸 辨識步驟</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <h4>選擇考試類別</h4>
+            <p>點頁面頂部的 <kbd>平時考核</kbd> <kbd>期中考試</kbd> <kbd>期末考試</kbd> 其中一個。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <h4>上傳考卷圖片</h4>
+            <p>點上傳區域選擇圖片，或直接將圖片拖放至虛線框中。<br>
+            <strong>可一次選取多張</strong>，系統會全部加入待辨識佇列。支援 JPG、PNG、WebP。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <h4>開始批次辨識</h4>
+            <p>點「🔍 開始批次辨識」。系統每次同時處理 3 張，進度條即時顯示完成狀況。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <h4>確認辨識結果</h4>
+            <p>辨識完成後顯示結果表格，每筆包含：</p>
+            <ul>
+              <li>縮圖預覽</li>
+              <li>辨識學號（可手動修改）</li>
+              <li>自動比對的學生姓名</li>
+              <li>辨識分數（可手動修改）</li>
+              <li>信心度：<span class="badge badge-green">高</span> <span class="badge badge-gold">中</span> <span class="badge badge-red">低</span>（低信心度請特別確認）</li>
+            </ul>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-body">
+            <h4>儲存成績</h4>
+            <p>逐筆點「儲存」，或點表格上方「💾 全部儲存到名冊」一次完成。<br>
+            若分數已存在會詢問是否覆蓋。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tip">
+        <span class="tip-icon">💡</span>
+        <span>辨識結果中的學號和分數欄位可直接在表格中修改，修改後再儲存，不需重新辨識。</span>
+      </div>
+
+      <div class="card" style="margin-top:1rem">
+        <div class="card-title">📌 考卷圖片拍攝建議</div>
+        <ul>
+          <li>確保學號格子和分數方框清晰可見，不被遮擋</li>
+          <li>光線充足，避免反光或陰影覆蓋文字</li>
+          <li>拍攝角度盡量正面，減少透視失真</li>
+          <li>分數填寫字跡要清楚，避免潦草</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 5. Manual -->
+    <section class="section" id="sec-manual">
+      <div class="section-header">
+        <div class="section-num">5</div>
+        <h2>手動輸入成績</h2>
+      </div>
+      <p style="margin-bottom:1rem">當圖片品質不佳或只需補登少數成績時，可使用手動輸入功能，同樣在「📷 掃描辨識」頁籤下方。</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <h4>輸入學號末 3 碼</h4>
+            <p>在「學號末 3 碼」欄位輸入數字（例如 <kbd>309</kbd>），系統即時搜尋名冊。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <h4>選擇學生</h4>
+            <ul>
+              <li><strong>只有 1 位符合</strong>：自動選定，焦點直接跳到分數欄</li>
+              <li><strong>多位符合</strong>：顯示所有候選按鈕，點選正確學生</li>
+              <li><strong>無符合</strong>：提示找不到，請確認末 3 碼</li>
+            </ul>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <h4>輸入分數並儲存</h4>
+            <p>輸入分數（0～100）後按 <kbd>Enter</kbd> 或點「💾 儲存」，系統自動清空欄位，焦點回到末 3 碼欄，可繼續下一份。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tip">
+        <span class="tip-icon">💡</span>
+        <span>整個手動輸入流程只需鍵盤操作，非常適合快速批量登分。候選按鈕上若顯示橙色數字，表示該學生此次考試已有成績。</span>
+      </div>
+    </section>
+
+    <!-- 6. Grades overview -->
+    <section class="section" id="sec-grades">
+      <div class="section-header">
+        <div class="section-num">6</div>
+        <h2>成績總覽</h2>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📊 統計摘要列</div>
+        <div class="grid2" style="margin-top:.5rem">
+          <div style="font-size:13px"><strong>總人數</strong>：當前班級學生總數</div>
+          <div style="font-size:13px"><strong>平時已登分</strong>：已輸入平時成績人數</div>
+          <div style="font-size:13px"><strong>期中已登分</strong>：已輸入期中成績人數</div>
+          <div style="font-size:13px"><strong>期末已登分</strong>：已輸入期末成績人數</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">✏️ 直接在表格編輯</div>
+        <p>每位學生的平時、期中、期末分數欄位均可直接點擊輸入，修改後按 <kbd>Tab</kbd> 或點其他地方即自動儲存。</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🏅 等第對照</div>
+        <div class="grade-row">
+          <span class="grade-pill" style="background:#dbeafe;color:#1d4ed8">A＋　90 分以上</span>
+          <span class="grade-pill" style="background:#e0f2fe;color:#0369a1">A　80–89 分</span>
+          <span class="grade-pill" style="background:#dcfce7;color:#166534">B　70–79 分</span>
+          <span class="grade-pill" style="background:#fef9c3;color:#854d0e">C　60–69 分</span>
+          <span class="grade-pill" style="background:#fee2e2;color:#991b1b">F　59 分以下</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⇅ 排序與搜尋</div>
+        <ul>
+          <li>搜尋框可按學號或姓名過濾</li>
+          <li>下拉選單選擇依「順序」「平時」「期中」「期末」排序</li>
+          <li>點「⇅ 排序」切換升序 / 降序</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 7. Export -->
+    <section class="section" id="sec-export">
+      <div class="section-header">
+        <div class="section-num">7</div>
+        <h2>匯出 Excel</h2>
+      </div>
+
+      <p style="margin-bottom:1rem">點「📥 匯出 Excel」產生 .xlsx 檔案，格式與學校教務系統原始名冊完全相容。</p>
+
+      <table class="mtable">
+        <thead><tr><th>欄位</th><th>內容</th></tr></thead>
+        <tbody>
+          <tr><td>順序</td><td>座號 / 順序號</td></tr>
+          <tr><td>學號</td><td>學生學號</td></tr>
+          <tr><td>姓名</td><td>學生姓名</td></tr>
+          <tr><td>平時考核</td><td>平時成績分數</td></tr>
+          <tr><td>期中考試</td><td>期中成績分數</td></tr>
+          <tr><td>期末考試</td><td>期末成績分數</td></tr>
+          <tr><td>平時等第</td><td>A＋ / A / B / C / F</td></tr>
+          <tr><td>期中等第</td><td>A＋ / A / B / C / F</td></tr>
+          <tr><td>期末等第</td><td>A＋ / A / B / C / F</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <span class="note-icon">📎</span>
+        <span>檔名格式：<code>班級名稱_科目_日期.xlsx</code>，例如 <code>通訊2乙_電子學_2026-04-18.xlsx</code></span>
+      </div>
+    </section>
+
+    <!-- 8. Settings -->
+    <section class="section" id="sec-settings">
+      <div class="section-header">
+        <div class="section-num">8</div>
+        <h2>設定與儲存</h2>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title">🌙 暗黑模式</div>
+          <p>點右上角 <kbd>🌙 暗色</kbd> / <kbd>☀️ 亮色</kbd> 切換，選擇會被記住。<br>
+          若未手動選擇，自動跟隨手機系統設定。</p>
+        </div>
+        <div class="card">
+          <div class="card-title">💾 自動儲存</div>
+          <p>每次新增、修改、刪除資料，系統自動儲存至瀏覽器 LocalStorage，右下角顯示「💾 已自動儲存」提示。</p>
+        </div>
+      </div>
+
+      <div class="warn">
+        <span class="warn-icon">⚠️</span>
+        <div>
+          <p><strong>注意事項：</strong></p>
+          <ul style="padding-left:1rem;margin-top:.3rem">
+            <li>清除瀏覽器快取或「清除所有網站資料」會導致資料遺失</li>
+            <li>不同裝置、不同瀏覽器之間資料不會自動同步</li>
+            <li>建議定期點「📥 匯出 Excel」備份資料</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📱 安裝為手機 App（PWA）</div>
+        <ol style="padding-left:1.2rem">
+          <li>用 Safari 開啟 GitHub Pages 網址</li>
+          <li>點下方分享按鈕（□↑）</li>
+          <li>選「加入主畫面」</li>
+          <li>即可從主畫面像 App 一樣開啟，顯示精緻 Icon</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- 9. FAQ -->
+    <section class="section" id="sec-faq">
+      <div class="section-header">
+        <div class="section-num">9</div>
+        <h2>常見問題</h2>
+      </div>
+
+      <div class="card">
+        <div class="card-title">❓ 辨識結果學號或分數不正確？</div>
+        <p>直接在結果表格的學號 / 分數欄位點擊修改，確認後再按「儲存」。不需重新辨識。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">❓ 辨識信心度顯示「低」？</div>
+        <p>表示 AI 對辨識結果不確定，通常是因為字跡潦草或圖片模糊。請手動核對後再儲存，或改用手動輸入模式。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">❓ 名冊中找不到辨識到的學號？</div>
+        <p>可能是學號格式不符（例如辨識為純數字，但名冊中帶有英文字母前綴）。請在結果表格中修正學號後儲存，或直接在「✍️ 手動輸入」區域以末 3 碼搜尋補登。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">❓ 匯入 XLS 後出現「找不到學號或姓名欄位」？</div>
+        <p>請確認 XLS 第一列為標題列，且包含「學號」和「姓名」文字。如果標題列不在第一行，可先手動刪除多餘的標題行。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">❓ 手機上按「清空名冊」或「刪除」沒反應？</div>
+        <p>本系統已使用自訂確認視窗取代瀏覽器原生 confirm()，應正常彈出確認對話框。若遇問題請重新整理頁面再試。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">❓ 多個班級能不能都匯出到同一個 Excel？</div>
+        <p>目前每次匯出為一個班級一個檔案。如需合併，請分別匯出後在 Excel 中手動合併工作表。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">❓ 資料會上傳到雲端嗎？</div>
+        <p>所有名冊與成績資料僅儲存在您的本機瀏覽器中，完全不上傳。只有在「掃描辨識」時，圖片會透過 Cloudflare Worker 轉送給 Anthropic AI 進行分析，分析完畢即丟棄，不儲存。</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  成績掃描記錄系統 · AI 辨識版 &nbsp;|&nbsp; 使用說明 v1.0 &nbsp;|&nbsp; 2026
+</footer>
+
+<script>
+// Highlight active TOC item on scroll
+const sections = document.querySelectorAll('.section');
+const links    = document.querySelectorAll('.toc-link');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(l => l.classList.remove('active'));
+      const id = e.target.id;
+      const a = document.querySelector(`.toc-link[href="#${id}"]`);
+      if (a) a.classList.add('active');
+    }
+  });
+}, { rootMargin: '-30% 0px -60% 0px' });
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
