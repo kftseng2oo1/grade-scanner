@@ -844,11 +844,16 @@ function addStudent() {
 function importExcel(input) {
   const file = input.files[0];
   if(!file) return;
-  // Auto-create a new class named after the file (strip extension)
+  // 班級名稱取自檔名；若已有同名班級 → 合併（依學號），否則新建
   const fileName = file.name.replace(/\.[^.]+$/, '').trim() || '新班級';
-  const newId = 'cls_' + Date.now();
-  classes.push({ id:newId, name:fileName, subject:'', teacher:'', semester:'', students:[] });
-  currentClassId = newId;
+  const existing = classes.find(c=>c.name===fileName);
+  let target = existing;
+  if(!target){
+    target = { id:'cls_' + Date.now(), name:fileName, subject:'', teacher:'', semester:'', students:[] };
+    classes.push(target);
+  }
+  const isNew = !existing;
+  currentClassId = target.id;
   renderSidebar(); renderClassPanel();
   const reader = new FileReader();
   reader.onload = e => {
@@ -876,22 +881,31 @@ function importExcel(input) {
       };
       if(ci.id<0||ci.name<0){alert('找不到「學號」或「姓名」欄位，請確認格式');return;}
 
-      let added=0, skipped=0;
+      let added=0, updated=0, skipped=0;
+      const sts = target.students;
       for(let r=headerRow+1;r<data.length;r++){
         const row=data[r];
         const id=String(row[ci.id]||'').trim();
         const name=String(row[ci.name]||'').trim();
         if(!id||!name) continue;
-        if(curStudents().find(s=>s.id===id)){skipped++;continue;}
-        const seat = ci.seat>=0 ? (parseInt(row[ci.seat])||curStudents().length+1) : curStudents().length+1;
-        const scoreA = ci.scoreA>=0 ? (row[ci.scoreA]===''||row[ci.scoreA]==null?null:parseFloat(row[ci.scoreA])) : null;
-        const scoreB = ci.scoreB>=0 ? (row[ci.scoreB]===''||row[ci.scoreB]==null?null:parseFloat(row[ci.scoreB])) : null;
-        const scoreC = ci.scoreC>=0 ? (row[ci.scoreC]===''||row[ci.scoreC]==null?null:parseFloat(row[ci.scoreC])) : null;
-        curStudents().push({id,name,seat,scoreA,scoreB,scoreC});
+        const num = k => (ci[k]<0||row[ci[k]]===''||row[ci[k]]==null) ? null : parseFloat(row[ci[k]]);
+        const scoreA=num('scoreA'), scoreB=num('scoreB'), scoreC=num('scoreC');
+        const old = sts.find(s=>s.id===id);
+        if(old){
+          // 既有學生：只用檔案中「有值」的分數覆蓋，空白不會清掉原有成績
+          let changed=false;
+          [['scoreA',scoreA],['scoreB',scoreB],['scoreC',scoreC]].forEach(([k,v])=>{
+            if(v!==null && !isNaN(v) && old[k]!==v){ old[k]=v; changed=true; }
+          });
+          if(changed) updated++; else skipped++;
+          continue;
+        }
+        const seat = ci.seat>=0 ? (parseInt(row[ci.seat])||sts.length+1) : sts.length+1;
+        sts.push({id,name,seat,scoreA,scoreB,scoreC});
         added++;
       }
-      renderRoster(); updateCounts(); saveToLS();
-      alert(`匯入完成：新增 ${added} 位${skipped?'，略過重複 '+skipped+' 位':''}`);
+      renderSidebar(); renderRoster(); updateCounts(); saveToLS();
+      alert(`匯入完成（${isNew?'新建班級':'合併至既有班級'}「${target.name}」）：新增 ${added} 位`+(updated?`，更新成績 ${updated} 位`:'')+(skipped?`，無變動 ${skipped} 位`:''));
     } catch(err) {
       alert('讀取失敗：'+err.message);
     }
